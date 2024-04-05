@@ -48,6 +48,12 @@ int main(void)
 			 (4) Shell shows a status message for processed command 
 			 (5) loop returns to get_commnad() function
 		*/
+		
+		for(int i = 0; args[i]; i++){
+			printf("Arg %d: %s\n", i, args[i]);
+		}
+		
+		
 
 	} // end while
 }

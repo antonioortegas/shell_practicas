@@ -15,7 +15,6 @@ To compile and run the program:
 **/
 
 #include "job_control.h"   // remember to compile with module job_control.c
-#include <string.h>
 
 #define MAX_LINE 256 /* 256 chars per line, per command, should be enough. */
 

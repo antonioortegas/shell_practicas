@@ -63,6 +63,11 @@ int main(void)
 				// Print:
 				// Foreground pid: <pid>, command: <command>, <Status>, info: <signal>
 				status_res = analyze_status(status, &info);
+				if(info == 255){ // go back to prompt if info has an error value
+					// Error, command not found: <command>
+					printf("Error, command not found: %s\n", args[0]);
+					continue;
+				}
 				printf("Foreground pid: %d, command: %s, status: %s, info: %d\n", pid_wait, args[0], status_strings[status_res], info);
 			} else { // execute in background
 				// Print
@@ -73,10 +78,7 @@ int main(void)
 			// Child process
 			// invoke execvp with given command and arguments
 			execvp(args[0], args);
-			// if execvp does not find the binary, this will execute
-			// Print
-			// Error, command not found: <command>
-			printf("Error, command not found: %s\n", args[0]);
+			// if execvp does not find the binary, exit with an error
 			exit(-1);
 		}
 	} // end while

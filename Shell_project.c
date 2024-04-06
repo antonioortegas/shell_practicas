@@ -14,7 +14,8 @@ To compile and run the program:
 
 **/
 
-#include "job_control.h"   // remember to compile with module job_control.c 
+#include "job_control.h"   // remember to compile with module job_control.c
+#include <string.h>
 
 #define MAX_LINE 256 /* 256 chars per line, per command, should be enough. */
 
@@ -48,12 +49,37 @@ int main(void)
 			 (4) Shell shows a status message for processed command 
 			 (5) loop returns to get_commnad() function
 		*/
-		
+		/* print all arguments from the parser for debugging purposes
 		for(int i = 0; args[i]; i++){
 			printf("Arg %d: %s\n", i, args[i]);
 		}
-		
-		
+		*/
 
+		pid_fork = fork();
+		if(pid_fork > 0 ){
+			// Parent process
+			if(background == 0){ // if command has to be executed in foreground
+				// wait for child process to exit
+				pid_wait = waitpid(pid_fork, &status, 0);
+				// Print:
+				// Foreground pid: <pid>, command: <command>, <Status>, info: <signal>
+				int info;
+				status_res = analyze_status(status, &info);
+				printf("Foreground pid: %d, command: %s, status: %s, info: %d\n", pid_wait, args[0], status_strings[status_res], info);
+			} else { // execute in background
+				// Print
+				// Background job running... pid: <pid>, command: <command>
+				printf("Background job running... pid: %d, command: %s\n", pid_fork, args[0]);
+			}
+		} else {
+			// Child process
+			// invoke execvp with given command and arguments
+			execvp(args[0], args);
+			// if execvp does not find the binary, this will execute
+			// Print
+			// Error, command not found: <command>
+			printf("Error, command not found: %s\n", args[0]);
+			exit(-1);
+		}
 	} // end while
 }

@@ -62,7 +62,6 @@ int main(void)
 				pid_wait = waitpid(pid_fork, &status, 0);
 				// Print:
 				// Foreground pid: <pid>, command: <command>, <Status>, info: <signal>
-				int info;
 				status_res = analyze_status(status, &info);
 				printf("Foreground pid: %d, command: %s, status: %s, info: %d\n", pid_wait, args[0], status_strings[status_res], info);
 			} else { // execute in background

@@ -19,6 +19,28 @@ To compile and run the program:
 
 #define MAX_LINE 256 /* 256 chars per line, per command, should be enough. */
 
+job *bgtasks;
+
+void handler(){
+	job *task;
+	int pid_wait;
+	int status;
+	int info;
+	enum status status_res;
+	for(int i = 1; i <= list_size(bgtasks); i++){ // walk the array and see if any process has changed
+		task = get_item_bypos(bgtasks, i);
+		pid_wait = waitpid(task->pgid, &status, WNOHANG); // Bitwise '|' to set both flags
+		// Informar
+		status_res = analyze_status(status, &info);
+		printf("Background job updated, pid: %d, command: %s, status: %s, info: %d\n", pid_wait, task->command, status_strings[status_res], info);
+		//Borrar de la lista si ha finalizado
+		if(status_res == EXITED){
+			delete_job(bgtasks, task);
+		}
+		
+	}
+}
+
 // -----------------------------------------------------------------------
 //                            MAIN          
 // -----------------------------------------------------------------------
@@ -35,6 +57,10 @@ int main(void)
 	int info;				/* info processed by analyze_status() */
 
 	ignore_terminal_signals();
+
+	signal(SIGCHLD, handler);
+
+	bgtasks = new_list("bgstasks");
 
 	while (1)   /* Program terminates normally inside get_command() after ^D is typed*/
 	{   		
@@ -83,6 +109,8 @@ int main(void)
 				// Print
 				// Background job running... pid: <pid>, command: <command>
 				printf("Background job running... pid: %d, command: %s\n", pid_fork, args[0]);
+				// Add to bgtasks list
+				add_job(bgtasks, new_job(getpid(), args[0], BACKGROUND));
 			}
 		} else {
 			setpgid(getpid(), getpid()); //set group process id to process id

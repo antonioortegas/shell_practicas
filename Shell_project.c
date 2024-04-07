@@ -15,6 +15,7 @@ To compile and run the program:
 **/
 
 #include "job_control.h"   // remember to compile with module job_control.c
+#include <string.h>
 
 #define MAX_LINE 256 /* 256 chars per line, per command, should be enough. */
 
@@ -32,6 +33,8 @@ int main(void)
 	int status;             /* status returned by wait */
 	enum status status_res; /* status processed by analyze_status() */
 	int info;				/* info processed by analyze_status() */
+
+	ignore_terminal_signals();
 
 	while (1)   /* Program terminates normally inside get_command() after ^D is typed*/
 	{   		
@@ -54,12 +57,19 @@ int main(void)
 		}
 		*/
 
+		// Handle internal commands
+		if(strcmp(args[0], "cd") == 0){
+			chdir(args[1]);
+			continue;
+		}
+
 		pid_fork = fork();
 		if(pid_fork > 0 ){
 			// Parent process
 			if(background == 0){ // if command has to be executed in foreground
 				// wait for child process to exit
-				pid_wait = waitpid(pid_fork, &status, 0);
+				pid_wait = waitpid(pid_fork, &status, WUNTRACED);
+				tcsetpgrp(STDIN_FILENO, getpgrp());
 				// Print:
 				// Foreground pid: <pid>, command: <command>, <Status>, info: <signal>
 				status_res = analyze_status(status, &info);
@@ -75,6 +85,11 @@ int main(void)
 				printf("Background job running... pid: %d, command: %s\n", pid_fork, args[0]);
 			}
 		} else {
+			setpgid(getpid(), getpid()); //set group process id to process id
+			if(background == 0){ // give terminal to group if foreground process
+				tcsetpgrp(STDIN_FILENO, getpgrp());
+			}
+			restore_terminal_signals();
 			// Child process
 			// invoke execvp with given command and arguments
 			execvp(args[0], args);

@@ -21,15 +21,16 @@ To compile and run the program:
 
 job *bgtasks;
 
-void handler(){
+void handler(){ // when one of its children exits or stops.
 	job *task;
 	int pid_wait;
 	int status;
 	int info;
 	enum status status_res;
+
 	for(int i = 1; i <= list_size(bgtasks); i++){ // walk the array and see if any process has changed
-		task = get_item_bypos(bgtasks, i);
-		pid_wait = waitpid(task->pgid, &status, WNOHANG); // Bitwise '|' to set both flags
+		task = get_item_bypos(bgtasks, i); // get element i from the list
+		pid_wait = waitpid(task->pgid, &status, WUNTRACED | WNOHANG); // Bitwise '|' to set both flags
 		// Informar
 		status_res = analyze_status(status, &info);
 		printf("Background job updated, pid: %d, command: %s, status: %s, info: %d\n", pid_wait, task->command, status_strings[status_res], info);
@@ -37,6 +38,10 @@ void handler(){
 		if(status_res == EXITED){
 			delete_job(bgtasks, task);
 		}
+		if(status_res == SUSPENDED){
+			task->state = STOPPED;
+		}
+		
 		
 	}
 }
@@ -58,6 +63,8 @@ int main(void)
 
 	ignore_terminal_signals();
 
+	// signal SIGCHLD default behaviour is changed
+	// SIGCHLD is sent to the parent when any of its children exits or stops.
 	signal(SIGCHLD, handler);
 
 	bgtasks = new_list("bgstasks");
@@ -94,7 +101,7 @@ int main(void)
 			// Parent process
 			if(background == 0){ // if command has to be executed in foreground
 				// wait for child process to exit
-				pid_wait = waitpid(pid_fork, &status, WUNTRACED);
+				pid_wait = waitpid(pid_fork, &status, WUNTRACED); // return also if child has stopped instead of exited.
 				tcsetpgrp(STDIN_FILENO, getpgrp());
 				// Print:
 				// Foreground pid: <pid>, command: <command>, <Status>, info: <signal>
@@ -105,6 +112,9 @@ int main(void)
 					continue;
 				}
 				printf("Foreground pid: %d, command: %s, status: %s, info: %d\n", pid_wait, args[0], status_strings[status_res], info);
+				if(status_res == SUSPENDED){
+					add_job(bgtasks, new_job(getpid(), args[0], SUSPENDED));
+				}
 			} else { // execute in background
 				// Print
 				// Background job running... pid: <pid>, command: <command>

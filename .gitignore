@@ -3,3 +3,4 @@
 shell
 shell.c
 a.out
+*.log

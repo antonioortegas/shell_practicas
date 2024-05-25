@@ -1,6 +1,6 @@
 # gcc Shell_project.c job_control.c -o shell
 
-all: clean compile
+all: clean compile run
 
 compile: Shell_project.c
 # assignment requires the output file to be named a.out
@@ -13,4 +13,4 @@ clean:
 
 run:
 	@echo "running the shell"
-	./a.out
+	script -c "./a.out" ./shell.log

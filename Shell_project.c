@@ -24,6 +24,7 @@ To compile and run the program:
 // -----------------------------------------------------------------------
 
 int main(void) {
+    new_process_group(getpid());
     char inputBuffer[MAX_LINE]; /* buffer to hold the command entered */
     int background;             /* equals 1 if a command is followed by '&' */
     char *args[MAX_LINE / 2];   /* command line (of 256) has max of 128 arguments */
@@ -33,6 +34,8 @@ int main(void) {
     enum status status_res; /* status processed by analyze_status() */
     int info;               /* info processed by analyze_status() */
 
+    ignore_terminal_signals();
+    
     while (1) /* Program terminates normally inside get_command() after ^D is typed*/
     {
         printf("COMMAND->");
@@ -64,6 +67,13 @@ int main(void) {
             printf("Error when calling fork()");
         } else if (pid_fork == 0) {
             // child
+            //put child in new process group
+            new_process_group(getpid());
+            if(!background){
+                //get the terminal
+                tcsetpgrp(STDIN_FILENO, getpid());
+            }
+            restore_terminal_signals();
             // invoke execvp()
             if (execvp(args[0], args) == -1) {
                 printf("Error, command not found: %s\n", args[0]);
@@ -74,7 +84,12 @@ int main(void) {
             if (background) {
                 printf("Background job running... pid: %d, command: %s\n", pid_fork, args[0]);
             } else {
+                
+                //wait for child to finish
                 pid_wait = waitpid(pid_fork, &status, WUNTRACED);  // wait for child process
+                //get the terminal back
+                tcsetpgrp(STDIN_FILENO, getpid());
+                //print info
                 status_res = analyze_status(status, &info);
                 if (info != 1) {
                     printf("Foreground pid: %d, command: %s %s info: %d\n", pid_fork, args[0], status_strings[status_res], info);

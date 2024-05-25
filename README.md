@@ -3,7 +3,7 @@
 To compile the shell project, you need to run the following command:
 
 ```bash
-gcc Shell_project.c job_control.c -o shell
+gcc Shell_project.c job_control.c -o a.out
 ```
 
 or you can use the makefile:
@@ -15,5 +15,5 @@ make
 And then you can run the shell file:
 
 ```bash
-./shell
+./a.out
 ```

@@ -13,4 +13,4 @@ clean:
 
 run:
 	@echo "running the shell"
-	./shell
+	./a.out

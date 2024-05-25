@@ -21,9 +21,16 @@ To compile and run the program:
 
 job *list;
 
+// status of a process can be { SUSPENDED, SIGNALED, EXITED, CONTINUED};
+// job_state can be { FOREGROUND, BACKGROUND, STOPPED };
+
 void handler(int signal){
     //signal is 17 always, since we only handle 1 signal
     //this is executed when any of the child processes exit or are suspended
+
+    //control the access to the list
+    block_SIGCHLD();
+
     job *item = NULL;
     int status;
     int info;
@@ -41,19 +48,18 @@ void handler(int signal){
             //if waitpid returns, that job has been updated (suspended or exited)
             status_res = analyze_status(status, &info);
             if(status_res == SUSPENDED){
-                printf("El proceso en segundo plano %s con pid %d se ha suspendido", item->command, item->pgid);
-                fflush;
+                printf("El proceso en segundo plano %s con pid %d se ha suspendido\n", item->command, item->pgid);
                 //if the process was suspended, update the list with the new information
                 item->state = SUSPENDED;
             } else if(status_res == EXITED){
-                printf("El proceso en segundo plano %s con pid %d ha terminado su ejecucion", item->command, item->pgid);
-                fflush;
+                printf("El proceso en segundo plano %s con pid %d ha terminado su ejecucion\n", item->command, item->pgid);
                 //since the process has finished, we can delete it from our list
                 delete_job(list, item);
             }
             break;
         }
     }
+    unblock_SIGCHLD();
 }
 
 // -----------------------------------------------------------------------
@@ -104,6 +110,10 @@ int main(void) {
             }
             continue;
         }
+        if(strcmp(args[0], "jobs") == 0){
+            print_job_list(list);
+            continue;
+        }
 
         pid_fork = fork();
         if (pid_fork < 0) {
@@ -126,8 +136,10 @@ int main(void) {
             // parent
             if (background) {
                 // make a new job and add it to the list
+                block_SIGCHLD();
                 item = new_job(pid_fork, args[0], BACKGROUND);
                 add_job(list, item);
+                unblock_SIGCHLD();
                 printf("Background job running... pid: %d, command: %s\n", pid_fork, args[0]);
             } else {
                 //wait for child to finish
@@ -141,8 +153,10 @@ int main(void) {
                 }
                 //if it was suspended, add it to the list
                 if(status_res == SUSPENDED){
-                    item = new_job(pid_fork, args[0], BACKGROUND);
+                    block_SIGCHLD();
+                    item = new_job(pid_fork, args[0], STOPPED);
                     add_job(list, item);
+                    unblock_SIGCHLD();
                     printf("Añadido el proceso %s, con pid %d a la lista de jobs suspendidos\n", args[0], pid_fork);
                 }
             }

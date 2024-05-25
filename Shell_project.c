@@ -28,22 +28,31 @@ void handler(){ // when one of its children exits or stops.
 	int info;
 	enum status status_res;
 
+	print_job_list(bgtasks);
+
 	for(int i = 1; i <= list_size(bgtasks); i++){ // walk the array and see if any process has changed
 		task = get_item_bypos(bgtasks, i); // get element i from the list
 		pid_wait = waitpid(task->pgid, &status, WUNTRACED | WNOHANG); // Bitwise '|' to set both flags
-		// Informar
-		status_res = analyze_status(status, &info);
-		printf("Background job updated, pid: %d, command: %s, status: %s, info: %d\n", pid_wait, task->command, status_strings[status_res], info);
-		//Borrar de la lista si ha finalizado
-		if(status_res == EXITED){
-			delete_job(bgtasks, task);
+		if(pid_wait > 0){ // if a child has exited or stopped
+			status_res = analyze_status(status, &info);
+			if(info == 255){ // go back to prompt if info has an error value
+				// Error, command not found: <command>
+				printf("Error, command not found: %s\n", task->command);
+				continue;
+			}
+			printf("Background pid: %d, command: %s, status: %s, info: %d\n", pid_wait, task->command, status_strings[status_res], info);
+			if(status_res == SUSPENDED){
+				task->state = STOPPED;
+			} else {
+				delete_job(bgtasks, task);
+			}
 		}
-		if(status_res == SUSPENDED){
-			task->state = STOPPED;
-		}
+		//wait for zombie processes
 		
 		
 	}
+
+	print_job_list(bgtasks);
 }
 
 // -----------------------------------------------------------------------

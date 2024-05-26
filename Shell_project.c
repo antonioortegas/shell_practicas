@@ -55,7 +55,16 @@ void handler(int signal){
                 printf("El proceso en segundo plano %s con pid %d ha terminado su ejecucion\n", item->command, item->pgid);
                 //since the process has finished, we can delete it from our list
                 delete_job(list, item);
+            } else if(status_res == CONTINUED){
+                // continue in background
+                printf("El proceso %s con pid %d continua su ejecucion en segundo plano\n", item->command, item->pgid);
+                item->state = BACKGROUND;
+            } else if(status_res == SIGNALED){
+                //if i received a signal, they want to end me
+                printf("El proceso %s con pid %d ha sido eliminado\n", item->command, item->pgid);
+                delete_job(list, item);
             } else {
+                //should never happens, this is debug just in case
                 printf("ESTADO NO CONTROLADO EN HANDLER\n");
             }
             break;

@@ -88,7 +88,6 @@ int main(void) {
     enum status status_res; /* status processed by analyze_status() */
     int info;               /* info processed by analyze_status() */
 
-    ignore_terminal_signals();
 
     //install sigchld handler
     signal(SIGCHLD, handler);
@@ -98,6 +97,7 @@ int main(void) {
     
     while (1) /* Program terminates normally inside get_command() after ^D is typed*/
     {
+    ignore_terminal_signals();
         printf("COMMAND->");
         fflush(stdout);
         get_command(inputBuffer, MAX_LINE, args, &background); /* get next command */
@@ -148,24 +148,25 @@ int main(void) {
                 killpg(item->pgid, SIGCONT);
                 printf("El proceso %s con pid %d continua su ejecucion en primer plano\n", item->command, item->pgid);
                 //get the terminal back so it does not raise and IO error
-               
 
                 //wait for child to finish
                 pid_wait = waitpid(item->pgid, &status, WUNTRACED);  // wait for child process
-                delete_job(list, item); // borrar, porque ya no esta en background ni suspended
-                //get the terminal back
-                tcsetpgrp(STDIN_FILENO, getpid());
+                
                 //print info
                 status_res = analyze_status(status, &info);
                 if (info != 1) {
                     printf("Foreground pid: %d, command: %s %s info: %d\n", pid_fork, args[0], status_strings[status_res], info);
                 }
-                //if it was suspended, add it to the list
+                //if it was suspended, add it to the list. If exited, delete it.
                 if(status_res == SUSPENDED){
-                    item = new_job(pid_fork, args[0], STOPPED);
-                    add_job(list, item);
-                    printf("Añadido el proceso %s, con pid %d a la lista de jobs suspendidos\n", args[0], pid_fork);
+                    item->state = STOPPED;
+                    printf("Se ha denetido el proceso %s, con pid %d\n", args[0], pid_fork);
+                } else if (status_res == EXITED){
+                    printf("EL proceso %s, con pid %d ha terminado su ejecucion\n", args[0], pid_fork);
+                    delete_job(list, item); // borrar, porque ya no esta en background ni suspended
                 }
+                //get terminal back
+                tcsetpgrp(STDIN_FILENO, getpid());
             } else {
                 perror("Error executing fg, check that arguments are valid");
             }

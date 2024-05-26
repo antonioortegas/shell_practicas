@@ -55,6 +55,8 @@ void handler(int signal){
                 printf("El proceso en segundo plano %s con pid %d ha terminado su ejecucion\n", item->command, item->pgid);
                 //since the process has finished, we can delete it from our list
                 delete_job(list, item);
+            } else {
+                printf("ESTADO NO CONTROLADO EN HANDLER\n");
             }
             break;
         }
@@ -112,6 +114,29 @@ int main(void) {
         }
         if(strcmp(args[0], "jobs") == 0){
             print_job_list(list);
+            continue;
+        }
+        if(strcmp(args[0], "fg") == 0){
+            //TODO
+            continue;
+        }
+        if(strcmp(args[0], "bg") == 0){
+            //TODO
+            int pos = 1;
+            if(args[1] != NULL){
+                //if user inputs a position
+                pos = atoi(args[1]);
+            }
+            item = get_item_bypos(list, pos);
+            // si el item existe y esta suspendido, mandar una señal para que continue
+            if(item != NULL && item->state == STOPPED){
+                // comando valido, actualizar item numero (pos)
+                item->state = BACKGROUND;
+                killpg(item->pgid, SIGCONT);
+                printf("El proceso %s con pid %d continua su ejecucion en segundo plano\n", item->command, item->pgid);
+            } else {
+                perror("Error executing bg, check that arguments are valid");
+            }
             continue;
         }
 

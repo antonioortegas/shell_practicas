@@ -113,11 +113,39 @@ int main(void) {
             continue;
         }
         if(strcmp(args[0], "jobs") == 0){
+            block_SIGCHLD();
             print_job_list(list);
+            unblock_SIGCHLD();
             continue;
         }
         if(strcmp(args[0], "fg") == 0){
-            //TODO
+            //TODO figure out a way to properly handle the update of a process that returns to FOREGROUND
+            //TODO by calling "fg" that isnt copy pasting the whole waiting routine from the parent after the fork()
+            //TODO lines in this method marked with "TODO" should be removed once i figure it out            
+            block_SIGCHLD();
+            int pos = 1;
+            if(args[1] != NULL){
+                //if user inputs a position
+                pos = atoi(args[1]);
+            }
+            item = get_item_bypos(list, pos);
+            // si el item existe
+            if(item != NULL){
+                // 1. ceder terminal
+                // 2. actualizar lista
+                // 3. mandar SIGCONT por si estuviera suspendido
+                tcsetpgrp(STDIN_FILENO, item->pgid);
+                item->state = FOREGROUND;
+                killpg(item->pgid, SIGCONT);
+                printf("El proceso %s con pid %d continua su ejecucion en primer plano\n", item->command, item->pgid);
+                waitpid(item->pgid, &status, WUNTRACED); // wait for that process to update //TODO 
+                delete_job(list, item); // borrar, porque ya no esta en background ni suspended
+                //get the terminal back so it does not raise and IO error
+                tcsetpgrp(STDIN_FILENO, getpid()); //TODO
+            } else {
+                perror("Error executing bg, check that arguments are valid");
+            }
+            unblock_SIGCHLD();
             continue;
         }
         if(strcmp(args[0], "bg") == 0){

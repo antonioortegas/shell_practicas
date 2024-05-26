@@ -43,7 +43,7 @@ void handler(int signal){
         index++;
         //call waitpid with 2 options ( | bitwise operator )
         //WNOHANG so it does not hang waiting for unfinished processes, since some of the jobs are still running
-        pid_wait = waitpid(item->pgid, &status, WUNTRACED | WNOHANG);
+        pid_wait = waitpid(item->pgid, &status, WUNTRACED | WNOHANG | __W_CONTINUED);
         if(pid_wait == item->pgid){
             //if waitpid returns, that job has been updated (suspended or exited)
             status_res = analyze_status(status, &info);
@@ -164,6 +164,8 @@ int main(void) {
                 } else if (status_res == EXITED){
                     printf("EL proceso %s, con pid %d ha terminado su ejecucion\n", args[0], pid_fork);
                     delete_job(list, item); // borrar, porque ya no esta en background ni suspended
+                } else {
+                    printf("UNHANDLED STATUS RES IN FG COMMAND");
                 }
                 //get terminal back
                 tcsetpgrp(STDIN_FILENO, getpid());
@@ -218,6 +220,7 @@ int main(void) {
                 add_job(list, item);
                 unblock_SIGCHLD();
                 printf("Background job running... pid: %d, command: %s\n", pid_fork, args[0]);
+                printf("Añadido el proceso %s, con pid %d a la lista de jobs suspendidos\n", args[0], pid_fork);
             } else {
                 //wait for child to finish
                 pid_wait = waitpid(pid_fork, &status, WUNTRACED);  // wait for child process

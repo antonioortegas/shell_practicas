@@ -149,7 +149,7 @@ int main(void) {
                 printf("El proceso %s con pid %d continua su ejecucion en primer plano\n", item->command, item->pgid);
                 //get the terminal back so it does not raise and IO error
                
-                
+
                 //wait for child to finish
                 pid_wait = waitpid(item->pgid, &status, WUNTRACED);  // wait for child process
                 delete_job(list, item); // borrar, porque ya no esta en background ni suspended
@@ -167,7 +167,7 @@ int main(void) {
                     printf("Añadido el proceso %s, con pid %d a la lista de jobs suspendidos\n", args[0], pid_fork);
                 }
             } else {
-                perror("Error executing bg, check that arguments are valid");
+                perror("Error executing fg, check that arguments are valid");
             }
             unblock_SIGCHLD();
             continue;

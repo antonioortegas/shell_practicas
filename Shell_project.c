@@ -43,7 +43,7 @@ void handler(int signal){
         index++;
         //call waitpid with 2 options ( | bitwise operator )
         //WNOHANG so it does not hang waiting for unfinished processes, since some of the jobs are still running
-        pid_wait = waitpid(item->pgid, &status, WUNTRACED | WNOHANG | __W_CONTINUED);
+        pid_wait = waitpid(item->pgid, &status, WUNTRACED | WNOHANG);
         if(pid_wait == item->pgid){
             //if waitpid returns, that job has been updated (suspended or exited)
             status_res = analyze_status(status, &info);
@@ -164,6 +164,14 @@ int main(void) {
                 } else if (status_res == EXITED){
                     printf("EL proceso %s, con pid %d ha terminado su ejecucion\n", args[0], pid_fork);
                     delete_job(list, item); // borrar, porque ya no esta en background ni suspended
+                } else if (status_res == SIGNALED){
+                    //if i received a signal, they want to end me
+                    printf("El proceso %s con pid %d ha sido eliminado\n", item->command, item->pgid);
+                    delete_job(list, item);
+                } else if(status_res == CONTINUED){
+                    // continue in background
+                    printf("El proceso %s con pid %d continua su ejecucion en segundo plano\n", item->command, item->pgid);
+                    item->state = BACKGROUND;
                 } else {
                     printf("UNHANDLED STATUS RES IN FG COMMAND");
                 }

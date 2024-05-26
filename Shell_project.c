@@ -144,10 +144,11 @@ int main(void) {
                 // 2. actualizar lista
                 // 3. mandar SIGCONT por si estuviera suspendido
                 tcsetpgrp(STDIN_FILENO, item->pgid);
+                if(item->state == STOPPED){
+                    killpg(item->pgid, SIGCONT);
+                }
                 item->state = FOREGROUND;
-                killpg(item->pgid, SIGCONT);
                 printf("El proceso %s con pid %d continua su ejecucion en primer plano\n", item->command, item->pgid);
-                //get the terminal back so it does not raise and IO error
 
                 //wait for child to finish
                 pid_wait = waitpid(item->pgid, &status, WUNTRACED);  // wait for child process

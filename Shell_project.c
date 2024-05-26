@@ -155,14 +155,14 @@ int main(void) {
                 //print info
                 status_res = analyze_status(status, &info);
                 if (info != 1) {
-                    printf("Foreground pid: %d, command: %s %s info: %d\n", pid_fork, args[0], status_strings[status_res], info);
+                    printf("Foreground pid: %d, command: %d %s info: %d\n", pid_wait, item->pgid, status_strings[status_res], info);
                 }
                 //if it was suspended, add it to the list. If exited, delete it.
                 if(status_res == SUSPENDED){
                     item->state = STOPPED;
-                    printf("Se ha denetido el proceso %s, con pid %d\n", args[0], pid_fork);
+                    printf("Se ha denetido el proceso %s, con pid %d\n", item->command, item->pgid);
                 } else if (status_res == EXITED){
-                    printf("EL proceso %s, con pid %d ha terminado su ejecucion\n", args[0], pid_fork);
+                    printf("EL proceso %s, con pid %d ha terminado su ejecucion\n", item->command, item->pgid);
                     delete_job(list, item); // borrar, porque ya no esta en background ni suspended
                 } else if (status_res == SIGNALED){
                     //if i received a signal, they want to end me
@@ -184,6 +184,7 @@ int main(void) {
             continue;
         }
         if(strcmp(args[0], "bg") == 0){
+            block_SIGCHLD();
             int pos = 1;
             if(args[1] != NULL){
                 //if user inputs a position
@@ -199,6 +200,7 @@ int main(void) {
             } else {
                 perror("Error executing bg, check that arguments are valid");
             }
+            unblock_SIGCHLD();
             continue;
         }
 

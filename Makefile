@@ -1,6 +1,6 @@
 # gcc Shell_project.c job_control.c -o shell
 
-all: clean compile run
+all: clean compile
 
 compile: Shell_project.c
 # assignment requires the output file to be named a.out

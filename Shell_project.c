@@ -121,7 +121,6 @@ int main(void) {
             continue;
         }
         if(strcmp(args[0], "bg") == 0){
-            //TODO
             int pos = 1;
             if(args[1] != NULL){
                 //if user inputs a position

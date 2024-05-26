@@ -147,10 +147,25 @@ int main(void) {
                 item->state = FOREGROUND;
                 killpg(item->pgid, SIGCONT);
                 printf("El proceso %s con pid %d continua su ejecucion en primer plano\n", item->command, item->pgid);
-                waitpid(item->pgid, &status, WUNTRACED); // wait for that process to update //TODO 
-                delete_job(list, item); // borrar, porque ya no esta en background ni suspended
                 //get the terminal back so it does not raise and IO error
-                tcsetpgrp(STDIN_FILENO, getpid()); //TODO
+               
+                
+                //wait for child to finish
+                pid_wait = waitpid(item->pgid, &status, WUNTRACED);  // wait for child process
+                delete_job(list, item); // borrar, porque ya no esta en background ni suspended
+                //get the terminal back
+                tcsetpgrp(STDIN_FILENO, getpid());
+                //print info
+                status_res = analyze_status(status, &info);
+                if (info != 1) {
+                    printf("Foreground pid: %d, command: %s %s info: %d\n", pid_fork, args[0], status_strings[status_res], info);
+                }
+                //if it was suspended, add it to the list
+                if(status_res == SUSPENDED){
+                    item = new_job(pid_fork, args[0], STOPPED);
+                    add_job(list, item);
+                    printf("Añadido el proceso %s, con pid %d a la lista de jobs suspendidos\n", args[0], pid_fork);
+                }
             } else {
                 perror("Error executing bg, check that arguments are valid");
             }

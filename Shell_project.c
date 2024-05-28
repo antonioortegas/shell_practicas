@@ -37,8 +37,8 @@ void handler(int signal){
     int index = 1; // LIST STARTS ON 1, I GUESS WE ARE DOING LUA INDEXING NOW
     int pid_wait;
     int status_res;
-
-    for(int i = 1; i <= list_size(list); i++){
+    int i;
+    for(i = 1; i <= list_size(list); i++){
         item = get_item_bypos(list, index);
         //call waitpid with 2 options ( | bitwise operator )
         //WNOHANG so it does not hang waiting for unfinished processes, since some of the jobs are still running

@@ -38,9 +38,8 @@ void handler(int signal){
     int pid_wait;
     int status_res;
 
-    while(index <= list_size(list)){
+    for(int i = 1; i <= list_size(list); i++){
         item = get_item_bypos(list, index);
-        index++;
         //call waitpid with 2 options ( | bitwise operator )
         //WNOHANG so it does not hang waiting for unfinished processes, since some of the jobs are still running
         pid_wait = waitpid(item->pgid, &status, WUNTRACED | WNOHANG);
@@ -50,11 +49,12 @@ void handler(int signal){
             if(status_res == SUSPENDED){
                 printf("El proceso en segundo plano %s con pid %d se ha suspendido\n", item->command, item->pgid);
                 //if the process was suspended, update the list with the new information
-                item->state = SUSPENDED;
+                item->state = STOPPED;
             } else if(status_res == EXITED){
                 printf("El proceso en segundo plano %s con pid %d ha terminado su ejecucion\n", item->command, item->pgid);
                 //since the process has finished, we can delete it from our list
                 delete_job(list, item);
+                i--;
             } else if(status_res == CONTINUED){
                 // continue in background
                 printf("El proceso %s con pid %d continua su ejecucion en segundo plano\n", item->command, item->pgid);
@@ -63,6 +63,7 @@ void handler(int signal){
                 //if i received a signal, they want to end me
                 printf("El proceso %s con pid %d ha sido eliminado\n", item->command, item->pgid);
                 delete_job(list, item);
+                i--;
             } else {
                 //should never happens, this is debug just in case
                 printf("ESTADO NO CONTROLADO EN HANDLER\n");

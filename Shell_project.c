@@ -1,6 +1,8 @@
 /**
 UNIX Shell Project
 
+Alumno: Antonio Ortega Santaolalla
+
 Sistemas Operativos
 Grados I. Informatica, Computadores & Software
 Dept. Arquitectura de Computadores - UMA
@@ -15,6 +17,7 @@ To compile and run the program:
 **/
 
 #include "job_control.h"  // remember to compile with module job_control.c
+#include "parse_redir.h"
 #include <string.h>
 
 #define MAX_LINE 256 /* 256 chars per line, per command, should be enough. */
@@ -42,7 +45,7 @@ void handler(int signal){
         item = get_item_bypos(list, index);
         //call waitpid with 2 options ( | bitwise operator )
         //WNOHANG so it does not hang waiting for unfinished processes, since some of the jobs are still running
-        pid_wait = waitpid(item->pgid, &status, WUNTRACED | WNOHANG);
+        pid_wait = waitpid(item->pgid, &status, WUNTRACED | WNOHANG | WCONTINUED);
         if(pid_wait == item->pgid){
             //if waitpid returns, that job has been updated (suspended or exited)
             status_res = analyze_status(status, &info);
@@ -55,20 +58,19 @@ void handler(int signal){
                 //since the process has finished, we can delete it from our list
                 delete_job(list, item);
                 i--;
-            } else if(status_res == CONTINUED){
-                // continue in background
-                printf("El proceso %s con pid %d continua su ejecucion en segundo plano\n", item->command, item->pgid);
-                item->state = BACKGROUND;
             } else if(status_res == SIGNALED){
                 //if i received a signal, they want to end me
                 printf("El proceso %s con pid %d ha sido eliminado\n", item->command, item->pgid);
                 delete_job(list, item);
                 i--;
+            } else if(status_res == CONTINUED){
+                // continue in background
+                printf("El proceso %s con pid %d continua su ejecucion en segundo plano\n", item->command, item->pgid);
+                item->state = BACKGROUND;
             } else {
-                //should never happens, this is debug just in case
+                //should never happen, this is debug just in case
                 printf("ESTADO NO CONTROLADO EN HANDLER\n");
             }
-            break;
         }
     }
     unblock_SIGCHLD();
@@ -89,19 +91,29 @@ int main(void) {
     enum status status_res; /* status processed by analyze_status() */
     int info;               /* info processed by analyze_status() */
 
+    int fg_command_fork = 0;
+
+    ignore_terminal_signals();
 
     //install sigchld handler
     signal(SIGCHLD, handler);
 
     job *item;
     list = new_list("list");
+
+    //redirect
+    char *file_in = NULL;
+	char *file_out = NULL;
+	FILE *f_in = stdin;
+	FILE *f_out = stdout;
     
     while (1) /* Program terminates normally inside get_command() after ^D is typed*/
     {
-    ignore_terminal_signals();
         printf("COMMAND->");
         fflush(stdout);
         get_command(inputBuffer, MAX_LINE, args, &background); /* get next command */
+        //function to parse redirections defined in parse_redir.h
+        parse_redirections(args, &file_in, &file_out); //parse redir if there are any
 
         if (args[0] == NULL) continue;  // if empty command
 
@@ -129,9 +141,6 @@ int main(void) {
             continue;
         }
         if(strcmp(args[0], "fg") == 0){
-            //TODO figure out a way to properly handle the update of a process that returns to FOREGROUND
-            //TODO by calling "fg" that isnt copy pasting the whole waiting routine from the parent after the fork()
-            //TODO lines in this method marked with "TODO" should be removed once i figure it out            
             block_SIGCHLD();
             int pos = 1;
             if(args[1] != NULL){
@@ -141,6 +150,7 @@ int main(void) {
             item = get_item_bypos(list, pos);
             // si el item existe
             if(item != NULL){
+                fg_command_fork = 1;
                 // 1. ceder terminal
                 // 2. actualizar lista
                 // 3. mandar SIGCONT por si estuviera suspendido
@@ -148,42 +158,13 @@ int main(void) {
                 if(item->state == STOPPED){
                     killpg(item->pgid, SIGCONT);
                 }
-                item->state = FOREGROUND;
-                printf("El proceso %s con pid %d continua su ejecucion en primer plano\n", item->command, item->pgid);
-
-                //wait for child to finish
-                pid_wait = waitpid(item->pgid, &status, WUNTRACED);  // wait for child process
-                
-                //print info
-                status_res = analyze_status(status, &info);
-                if (info != 1) {
-                    printf("Foreground pid: %d, command: %d %s info: %d\n", pid_wait, item->pgid, status_strings[status_res], info);
-                }
-                //if it was suspended, add it to the list. If exited, delete it.
-                if(status_res == SUSPENDED){
-                    item->state = STOPPED;
-                    printf("Se ha denetido el proceso %s, con pid %d\n", item->command, item->pgid);
-                } else if (status_res == EXITED){
-                    printf("EL proceso %s, con pid %d ha terminado su ejecucion\n", item->command, item->pgid);
-                    delete_job(list, item); // borrar, porque ya no esta en background ni suspended
-                } else if (status_res == SIGNALED){
-                    //if i received a signal, they want to end me
-                    printf("El proceso %s con pid %d ha sido eliminado\n", item->command, item->pgid);
-                    delete_job(list, item);
-                } else if(status_res == CONTINUED){
-                    // continue in background
-                    printf("El proceso %s con pid %d continua su ejecucion en segundo plano\n", item->command, item->pgid);
-                    item->state = BACKGROUND;
-                } else {
-                    printf("UNHANDLED STATUS RES IN FG COMMAND");
-                }
-                //get terminal back
-                tcsetpgrp(STDIN_FILENO, getpid());
+                pid_fork = item->pgid;
+				strcpy(args[0], item->command); // Copiar el nombre del comando original a args[0]
+				delete_job(list, item);
             } else {
                 perror("Error executing fg, check that arguments are valid");
             }
             unblock_SIGCHLD();
-            continue;
         }
         if(strcmp(args[0], "bg") == 0){
             block_SIGCHLD();
@@ -206,7 +187,9 @@ int main(void) {
             continue;
         }
 
-        pid_fork = fork();
+        if(!fg_command_fork){ //fork only if we are not in a fg command
+            pid_fork = fork();
+        }
         if (pid_fork < 0) {
             printf("Error when calling fork()");
         } else if (pid_fork == 0) {
@@ -218,21 +201,52 @@ int main(void) {
                 tcsetpgrp(STDIN_FILENO, getpid());
             }
             restore_terminal_signals();
+
+            //redirect
+            if(file_in != NULL){
+                f_in = fopen(file_in, "r");
+                if(f_in == NULL){
+                    perror("Error opening file for input redirection: ");
+                    exit(EXIT_FAILURE);
+                }
+                dup2(fileno(f_in), STDIN_FILENO);
+            }
+            if(file_out != NULL){
+                f_out = fopen(file_out, "w");
+                if(f_out == NULL){
+                    perror("Error opening file for output redirection: ");
+                    exit(EXIT_FAILURE);
+                }
+                dup2(fileno(f_out), STDOUT_FILENO);
+            }
             // invoke execvp()
             if (execvp(args[0], args) == -1) {
                 printf("Error, command not found: %s\n", args[0]);
             }
+            //if execvp fails, close the file descriptors and exit
+            dup2(STDERR_FILENO, STDOUT_FILENO); //restore stdout
+
+
+            if(file_in != NULL){
+                fclose(f_in);
+            }
+            if(file_out != NULL){
+                fclose(f_out);
+            }
+
             exit(EXIT_FAILURE);
         } else {
             // parent
+            new_process_group(pid_fork);
+            fg_command_fork = 0; //reset fg_command_fork
             if (background) {
                 // make a new job and add it to the list
                 block_SIGCHLD();
                 item = new_job(pid_fork, args[0], BACKGROUND);
                 add_job(list, item);
-                unblock_SIGCHLD();
                 printf("Background job running... pid: %d, command: %s\n", pid_fork, args[0]);
                 printf("Añadido el proceso %s, con pid %d a la lista de jobs suspendidos\n", args[0], pid_fork);
+                unblock_SIGCHLD();
             } else {
                 //wait for child to finish
                 pid_wait = waitpid(pid_fork, &status, WUNTRACED);  // wait for child process
@@ -240,16 +254,16 @@ int main(void) {
                 tcsetpgrp(STDIN_FILENO, getpid());
                 //print info
                 status_res = analyze_status(status, &info);
-                if (info != 1) {
-                    printf("Foreground pid: %d, command: %s %s info: %d\n", pid_fork, args[0], status_strings[status_res], info);
-                }
                 //if it was suspended, add it to the list
                 if(status_res == SUSPENDED){
                     block_SIGCHLD();
                     item = new_job(pid_fork, args[0], STOPPED);
                     add_job(list, item);
-                    unblock_SIGCHLD();
                     printf("Añadido el proceso %s, con pid %d a la lista de jobs suspendidos\n", args[0], pid_fork);
+                    unblock_SIGCHLD();
+                } else {
+                    //if it was not suspended, just print the info
+                    printf("Foreground pid: %d, command: %s %s info: %d\n", pid_fork, args[0], status_strings[status_res], info);
                 }
             }
         }
